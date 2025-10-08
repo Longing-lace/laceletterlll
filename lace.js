@@ -7157,13 +7157,14 @@ ${enabledCustomCategories.length > 0 ? `7. 自定义分类的热搜要紧密围�
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -7762,13 +7763,14 @@ ${xProfile.showRealName && xProfile.realName ? `- 真实姓名：${xProfile.real
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -10333,13 +10335,14 @@ ${npc.homepage || '暂无主页内容设置'}
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -11311,13 +11314,14 @@ accountReplies数组（2-4条，账户的回复记录）：
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -13554,13 +13558,14 @@ ${existingQuestionsContext}
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -19833,13 +19838,14 @@ ${tweetData.link ? `链接：${tweetData.link.title || tweetData.link.url}` : ''
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -21433,13 +21439,14 @@ ${tweetAuthorCharacter.relationships
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
@@ -22689,13 +22696,14 @@ ${
           stream: false,
         };
         response = await fetch(`${proxyUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(openAiPayload),
-        });
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(openAiPayload),
+      mode: 'cors' // 【新增】增强跨域请求的兼容性
+    });
       }
 
       if (!response.ok) {
