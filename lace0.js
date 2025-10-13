@@ -2981,10 +2981,12 @@
           flex: 1;
           overflow-y: auto;
           background-color: var(--x-bg-primary);
+          padding-bottom: 120px; /* 增加底部内边距，为输入框留出空间 */
+          box-sizing: border-box; /* 确保内边距不会增加元素总高度 */
         ">
-          <!-- 用户详细信息区域 -->
-          <div style="
-            display: flex;
+            <div style="
+              display: flex;
+
             flex-direction: column;
             align-items: center;
             padding: 20px 16px;
@@ -3041,11 +3043,19 @@
 
         <!-- 底部输入区域 -->
         <div class="message-input-area" style="
+          position: fixed; /* 固定在屏幕上 */
+          bottom: 0; /* 对齐到屏幕底部 */
+          left: 0;
+          right: 0;
+          z-index: 10; /* 确保在内容之上 */
           padding: 12px 16px;
           background-color: var(--x-bg-primary);
+          border-top: 1px solid var(--x-border-color);
+          /* 适配iOS刘海屏底部安全区域 */
+          padding-bottom: calc(12px + env(safe-area-inset-bottom));
         ">
-          <!-- 全包裹输入框容器 -->
           <div style="
+
             display: flex;
             align-items: center;
             gap: 8px;
@@ -35387,7 +35397,8 @@ ${index + 1}. "${tweet.content}"
 
     // 滑入动画
     requestAnimationFrame(() => {
-      notification.style.top = '16px';
+      notification.style.top = 'calc(0px + env(safe-area-inset-top))';
+
     });
 
     // 自动滑出并移除
