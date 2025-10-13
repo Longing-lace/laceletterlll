@@ -35295,7 +35295,7 @@ ${index + 1}. "${tweet.content}"
 
     // 滑入动画
     requestAnimationFrame(() => {
-      notification.style.top = 'calc(5px + env(safe-area-inset-top))';
+      notification.style.top = 'calc(0px + env(safe-area-inset-top))';
     });
 
     // 自动滑出并移除
@@ -35799,10 +35799,14 @@ ${index + 1}. "${tweet.content}"
         loadMessageConversation(messageData, null);
       }
     }
+    // 在这里添加新代码
+      setupIosKeyboardListener();
+      handleIosKeyboardResize(); // 初始调用一次以设置正确的高度
   };
 
   // 关闭私信详情页面
   window.closeMessageDetail = async function () {
+    cleanupIosKeyboardListener();
     // 清空输入框
     const input = document.getElementById('message-input');
     if (input) {
@@ -40228,6 +40232,51 @@ ${index + 1}. "${tweet.content}"
   }
 
   console.log('📦 X Social App 模块已加载，版本: 1.0');
+
+// ============================================
+// iOS 键盘遮挡修复
+// ============================================
+
+// 1. 核心处理函数：当键盘弹出或收起时，调整页面高度
+function handleIosKeyboardResize() {
+    const messageDetailPage = document.getElementById('x-message-detail-page');
+    // 确保只在私信详情页显示时执行
+    if (!messageDetailPage || messageDetailPage.style.display === 'none') return;
+    
+    // 检查是否为iOS设备
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS || !window.visualViewport) return;
+
+    // 将私信页面的高度设置为可见区域的高度
+    messageDetailPage.style.height = window.visualViewport.height + 'px';
+    
+    // 滚动到底部，确保输入框可见
+    const scrollableArea = document.getElementById('message-detail-scrollable');
+    if(scrollableArea) {
+        scrollableArea.scrollTop = scrollableArea.scrollHeight;
+    }
+}
+
+// 2. 设置监听器
+function setupIosKeyboardListener() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS || !window.visualViewport) return;
+
+    // 添加对 visualViewport 的 resize 事件监听
+    console.log('⌨️ iOS Keyboard: 添加监听器');
+    window.visualViewport.addEventListener('resize', handleIosKeyboardResize);
+}
+
+// 3. 清理监听器
+function cleanupIosKeyboardListener() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS || !window.visualViewport) return;
+    
+    // 移除监听，防止内存泄漏
+    console.log('⌨️ iOS Keyboard: 移除监听器');
+    window.visualViewport.removeEventListener('resize', handleIosKeyboardResize);
+}
+
 })(window);
 
 // ==========================================
