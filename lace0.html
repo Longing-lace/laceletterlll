@@ -36016,26 +36016,50 @@ async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
         console.log(`【调试】请求头:`, { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' });
         console.log(`【调试】请求体:`, requestBody);
 
-        // 🔥【CORS代理】如果直接请求失败，使用CORS代理中转
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const proxiedUrl = corsProxy + requestUrl;
+        // 🔥【CORS代理】尝试多个CORS代理
+        const corsProxies = [
+            'https://allorigins.win/raw?url=',
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/'
+        ];
 
         console.log(`【调试】尝试直接请求: ${requestUrl}`);
 
         // 使用t2a_v2接口,音质更好更自然
-        let response = await fetch(requestUrl, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        }).catch(async (error) => {
-            console.log(`【调试】直接请求失败，尝试使用CORS代理: ${error.message}`);
-            // 如果直接请求失败，尝试使用CORS代理
-            return await fetch(proxiedUrl, {
+        let response;
+        let lastError;
+
+        // 先尝试直接请求
+        try {
+            response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-        });
+        } catch (error) {
+            lastError = error;
+            console.log(`【调试】直接请求失败: ${error.message}`);
+
+            // 尝试CORS代理
+            for (let proxy of corsProxies) {
+                try {
+                    const proxiedUrl = proxy + encodeURIComponent(requestUrl);
+                    console.log(`【调试】尝试CORS代理: ${proxy}`);
+                    response = await fetch(proxiedUrl, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+                    if (response.ok) {
+                        console.log(`【调试】CORS代理成功: ${proxy}`);
+                        break;
+                    }
+                } catch (proxyError) {
+                    console.log(`【调试】CORS代理失败 ${proxy}: ${proxyError.message}`);
+                    lastError = proxyError;
+                }
+            }
+        }
 
         console.log(`【调试】响应状态: ${response.status} ${response.statusText}`);
         console.log(`【调试】响应头:`, {
@@ -50129,26 +50153,50 @@ async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
         console.log(`【调试】请求头:`, { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' });
         console.log(`【调试】请求体:`, requestBody);
 
-        // 🔥【CORS代理】如果直接请求失败，使用CORS代理中转
-        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
-        const proxiedUrl = corsProxy + requestUrl;
+        // 🔥【CORS代理】尝试多个CORS代理
+        const corsProxies = [
+            'https://allorigins.win/raw?url=',
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/'
+        ];
 
         console.log(`【调试】尝试直接请求: ${requestUrl}`);
 
         // 使用t2a_v2接口,音质更好更自然
-        let response = await fetch(requestUrl, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        }).catch(async (error) => {
-            console.log(`【调试】直接请求失败，尝试使用CORS代理: ${error.message}`);
-            // 如果直接请求失败，尝试使用CORS代理
-            return await fetch(proxiedUrl, {
+        let response;
+        let lastError;
+
+        // 先尝试直接请求
+        try {
+            response = await fetch(requestUrl, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
-        });
+        } catch (error) {
+            lastError = error;
+            console.log(`【调试】直接请求失败: ${error.message}`);
+
+            // 尝试CORS代理
+            for (let proxy of corsProxies) {
+                try {
+                    const proxiedUrl = proxy + encodeURIComponent(requestUrl);
+                    console.log(`【调试】尝试CORS代理: ${proxy}`);
+                    response = await fetch(proxiedUrl, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    });
+                    if (response.ok) {
+                        console.log(`【调试】CORS代理成功: ${proxy}`);
+                        break;
+                    }
+                } catch (proxyError) {
+                    console.log(`【调试】CORS代理失败 ${proxy}: ${proxyError.message}`);
+                    lastError = proxyError;
+                }
+            }
+        }
 
         console.log(`【调试】响应状态: ${response.status} ${response.statusText}`);
         console.log(`【调试】响应头:`, {
