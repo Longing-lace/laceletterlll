@@ -12088,10 +12088,10 @@ input:checked + .slider:before {
 
 <!-- 🔥【新增】服务区选择 -->
 <div class="form-group">
-    <label for="minimax-domain-select">Minimax TTS 服务区</label>
-    <select id="minimax-domain-select" class="form-input">
-        <option value="https://api.minimax.chat">🇨🇳 国内 (api.minimax.chat)</option>
-        <option value="https://api.minimaxi.chat">🌏 海外 (api.minimaxi.chat)</option>
+    <label for="minimax-provider-select">Minimax TTS 服务区</label>
+    <select id="minimax-provider-select" class="form-input">
+        <option value="cn">国内版 (api.minimaxi.com)</option>
+        <option value="io">海外版 (api.minimax.io)</option>
     </select>
 </div>
 
@@ -20375,11 +20375,11 @@ async function loadAllDataFromDB() {
 
         // 🔥【新增】为旧角色兼容语速和语言设置
         if (!chat.isGroup && chat.settings) {
-            if (typeof chat.settings.minimaxVoiceSpeed === 'undefined') {
-                chat.settings.minimaxVoiceSpeed = 1.0;
+            if (typeof chat.settings.speed === 'undefined') {
+                chat.settings.speed = 1.0;
             }
-            if (typeof chat.settings.minimaxLanguage === 'undefined') {
-                chat.settings.minimaxLanguage = '';
+            if (typeof chat.settings.language_boost === 'undefined') {
+                chat.settings.language_boost = null;
             }
         }
         // ▲▲▲ 【Minimax TTS】为旧角色兼容minimaxVoiceId ▲▲▲
@@ -20457,7 +20457,7 @@ if (!chat.thoughtHistory) {
         });
     }
 
-    state.apiConfig = apiConfig || { id: 'main', proxyUrl: '', apiKey: '', model: '', temperature: 0.8, minimaxGroupId: '', minimaxApiKey: '', minimaxSpeechModel: 'speech-01-turbo', minimaxDomain: 'https://api.minimax.chat' };
+    state.apiConfig = apiConfig || { id: 'main', proxyUrl: '', apiKey: '', model: '', temperature: 0.8, minimaxGroupId: '', minimaxApiKey: '', minimaxSpeechModel: 'speech-01-turbo', minimaxProvider: 'cn' };
 
 state.globalSettings = globalSettings || {
     id: 'main',
@@ -21195,7 +21195,7 @@ function lenientExtractObject(blockStr) {
         });
 
         // ▼▼▼ 【Minimax TTS】加载minimax配置 ▼▼▼
-        document.getElementById('minimax-domain-select').value = state.apiConfig.minimaxDomain || 'https://api.minimax.chat';
+        document.getElementById('minimax-provider-select').value = state.apiConfig.minimaxProvider || 'cn';
         document.getElementById('minimax-group-id').value = state.apiConfig.minimaxGroupId || '';
         document.getElementById('minimax-api-key').value = state.apiConfig.minimaxApiKey || '';
 
@@ -35921,24 +35921,23 @@ function extractQuotedContent(text) {
 function stopMinimaxAudio() {
     if (!isTtsPlaying) return;
 
-    // 核心修改1：在执行停止操作前，先设置"故意停止"的标志为 true
     isIntentionalStop = true;
-
     const ttsPlayer = document.getElementById('tts-audio-player');
     ttsPlayer.pause();
-    ttsPlayer.src = ''; // 这行代码会触发 onerror 事件
+    ttsPlayer.src = ''; // 这会触发 onerror 事件，从而执行清理
 
     if (window.currentAnimatingBubbles) {
-        window.currentAnimatingBubbles.forEach(b => b.classList.remove('playing'));
+        window.currentAnimatingBubbles.forEach((b) => {
+            const spinner = b.querySelector('.loading-spinner');
+            if (spinner) spinner.style.display = 'none';
+            b.classList.remove('playing');
+        });
     }
 
     isTtsPlaying = false;
     currentTtsAudioBubble = null;
     window.currentAnimatingBubbles = null;
-    console.log('Minimax TTS: Playback stopped by user.');
 
-    // 核心修改2：用一个微小的延迟来重置标志位
-    // 这能确保 onerror 事件有足够的时间检查到标志位，然后再将其重置
     setTimeout(() => {
         isIntentionalStop = false;
     }, 100);
@@ -35950,176 +35949,177 @@ function stopMinimaxAudio() {
  * @param {string} voiceId - Minimax 的语音 ID
  * @param {Array<HTMLElement>} bubblesToAnimate - 需要播放动画的所有语音气泡元素的数组
  */
-async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
-    stopMinimaxAudio();
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const ttsPlayer = document.getElementById('tts-audio-player');
-    const firstBubble = bubblesToAnimate[0];
-
-    isTtsPlaying = true;
-    currentTtsAudioBubble = firstBubble;
-    window.currentAnimatingBubbles = bubblesToAnimate;
-    bubblesToAnimate.forEach(b => b.classList.add('playing'));
-
-    const mainAudioPlayer = document.getElementById('audio-player');
-    if (mainAudioPlayer && !mainAudioPlayer.paused) {
-        mainAudioPlayer.pause();
-        musicState.isPlaying = false;
-        updatePlayerUI();
-    }
-
-    const groupId = state.apiConfig.minimaxGroupId;
-    const apiKey = state.apiConfig.minimaxApiKey;
-    if (!groupId || !apiKey) {
-        await showCustomAlert('语音播放失败', '尚未配置Minimax的Group ID和API Key。');
-        stopMinimaxAudio();
-        return;
-    }
-
-    // ★★★ 核心修改：从全局 apiConfig 获取语音模型 ★★★
-    const speechModel = state.apiConfig.minimaxSpeechModel || 'speech-01-turbo';
-
-    console.log(`正在使用 Minimax 语音模型: ${speechModel}`);
-
-    // 🔥【新增】从聊天设置里获取语速和语言参数
-    const chat = state.chats[state.activeChatId];
-    const voiceSpeed = parseFloat(chat?.settings?.minimaxVoiceSpeed) || 1.0;
-    const language = chat?.settings?.minimaxLanguage || '';
-    console.log(`Minimax TTS 参数: 语速=${voiceSpeed}, 语言=${language || '未设置'}`);
-
-    // 🔥 t2a_v2接口 - 最简单的参数,不加emotion
-    const requestBody = {
-        text: text,
-        model: speechModel,
-        voice_setting: {
-            voice_id: voiceId,
-            speed: voiceSpeed,
-            pitch: 0,
-
+/**
+         * 【辅助函数】将Hex字符串转换为可播放的Blob URL
+         * @param {string} hex - 十六进制编码的音频数据
+         * @returns {string|null} - Blob URL 或 null
+         */
+        function hexToBlobUrl(hex) {
+          if (!hex) return null;
+          const cleanHex = hex.replace(/[^0-9a-fA-F]/g, "");
+          const length = cleanHex.length;
+          if (length % 2 !== 0) {
+            console.error("Hex string has an odd length.");
+            return null;
+          }
+          const buffer = new Uint8Array(length / 2);
+          for (let i = 0; i < length; i += 2) {
+            buffer[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
+          }
+          // 根据文档，推荐使用 mp3 格式
+          const blob = new Blob([buffer], { type: "audio/mpeg" });
+          return URL.createObjectURL(blob);
         }
-    };
 
-    // 🔥【修复】如果设置了语言增强，直接使用选择的值（已经是完整的语言名称了）
-    if (language) {
-        requestBody.language_boost = language;
-    }
+        /**
+         * 调用 Minimax TTS API 生成语音并播放
+         * @param {string} text - 要转换为语音的合并后的文本
+         * @param {string} voiceId - Minimax 的语音 ID
+         * @param {Array<HTMLElement>} bubblesToAnimate - 需要播放动画的所有语音气泡元素的数组
+         */
+        async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
+          stopMinimaxAudio();
+          await new Promise((resolve) => setTimeout(resolve, 50));
 
-    console.log('t2a_v2 请求参数:', JSON.stringify(requestBody, null, 2));
+          const ttsPlayer = document.getElementById("tts-audio-player");
+          const firstBubble = bubblesToAnimate[0];
+          if (!firstBubble) return;
 
-    try {
-        // 🔥【新增】根据服务区选择动态切换API地址
-        let baseUrl = document.getElementById('minimax-domain-select').value || 'https://api.minimax.chat';
-        let requestUrl = `${baseUrl}/v1/t2a_v2?GroupId=${groupId}`;
+          isTtsPlaying = true;
+          currentTtsAudioBubble = firstBubble;
+          window.currentAnimatingBubbles = bubblesToAnimate;
+          bubblesToAnimate.forEach((b) => {
+            const spinner = b.querySelector(".loading-spinner");
+            if (spinner) spinner.style.display = "block";
+          });
 
-        console.log(`使用API地址: ${baseUrl}, 请求地址: ${requestUrl}`);
-        console.log(`【调试】请求头:`, { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' });
-        console.log(`【调试】请求体:`, requestBody);
+          const mainAudioPlayer = document.getElementById("audio-player");
+          if (mainAudioPlayer && !mainAudioPlayer.paused) {
+            mainAudioPlayer.pause();
+            state.musicState.isPlaying = false;
+            updatePlayerUI();
+          }
 
-        // 🔥【CORS代理】尝试多个CORS代理
-        const corsProxies = [
-            'https://allorigins.win/raw?url=',
-            'https://api.allorigins.win/raw?url=',
-            'https://cors-anywhere.herokuapp.com/'
-        ];
+          const groupId = state.apiConfig.minimaxGroupId;
+          const apiKey = state.apiConfig.minimaxApiKey;
+          if (!groupId || !apiKey) {
+            await showCustomAlert(
+              "语音播放失败",
+              "尚未配置Minimax的Group ID和API Key。",
+            );
+            stopMinimaxAudio();
+            return;
+          }
 
-        console.log(`【调试】尝试直接请求: ${requestUrl}`);
+          const chat = state.chats[state.activeChatId];
+          if (!chat) {
+            stopMinimaxAudio();
+            return;
+          }
 
-        // 使用t2a_v2接口,音质更好更自然
-        let response;
-        let lastError;
+          const provider = state.apiConfig.minimaxProvider || "cn";
+          const speechModel =
+            state.apiConfig.minimaxSpeechModel || "speech-01-turbo";
+          const baseUrl =
+            provider === "cn"
+              ? "https://api.minimaxi.com"
+              : "https://api.minimax.io";
+          const requestUrl = `${baseUrl}/v1/t2a_v2`;
+          // 1. 从当前角色的设置中读取语速和语言增强
+          const speed = chat.settings.speed ?? 1.0;
+          const langBoost = chat.settings.language_boost; // 如果是null或undefined, 就让它是null/undefined
 
-        // 先尝试直接请求
-        try {
-            response = await fetch(requestUrl, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
+          const textForTts = text
+            .replace(/\(.*?\)|（.*?）|【.*?】/g, "")
+            .trim();
+
+          // 2. 构建包含新参数的请求体
+          const requestBody = {
+            model: speechModel,
+            text: textForTts, // <--- 核心修改在这里！使用过滤后的文本
+            voice_setting: {
+              voice_id: voiceId,
+              speed: speed, // ★ 在这里加入语速
+            },
+          };
+
+          // 3. 如果 language_boost 有效，才将它添加到请求体中
+          if (langBoost) {
+            requestBody.language_boost = langBoost;
+          }
+
+          console.log(`[Minimax TTS] Request to ${requestUrl}`, requestBody);
+
+          try {
+            const response = await fetch(`${requestUrl}?GroupId=${groupId}`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(requestBody),
             });
-        } catch (error) {
-            lastError = error;
-            console.log(`【调试】直接请求失败: ${error.message}`);
 
-            // 尝试CORS代理
-            for (let proxy of corsProxies) {
-                try {
-                    const proxiedUrl = proxy + encodeURIComponent(requestUrl);
-                    console.log(`【调试】尝试CORS代理: ${proxy}`);
-                    response = await fetch(proxiedUrl, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
-                    });
-                    if (response.ok) {
-                        console.log(`【调试】CORS代理成功: ${proxy}`);
-                        break;
-                    }
-                } catch (proxyError) {
-                    console.log(`【调试】CORS代理失败 ${proxy}: ${proxyError.message}`);
-                    lastError = proxyError;
-                }
+            const result = await response.json();
+
+            if (
+              !response.ok ||
+              (result.base_resp && result.base_resp.status_code !== 0)
+            ) {
+              throw new Error(
+                `API错误码 ${
+                  result.base_resp?.status_code || response.status
+                }: ${result.base_resp?.status_msg || response.statusText}`,
+              );
             }
-        }
 
-        console.log(`【调试】响应状态: ${response.status} ${response.statusText}`);
-        console.log(`【调试】响应头:`, {
-            'content-type': response.headers.get('content-type'),
-            'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
-            'access-control-allow-methods': response.headers.get('access-control-allow-methods')
-        });
+            if (!result.data || !result.data.audio) {
+              throw new Error("API响应中未找到有效的音频数据。");
+            }
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Minimax API 错误: ${errorData.base_resp?.status_msg || response.statusText}`);
-        }
+            const audioUrl = hexToBlobUrl(result.data.audio);
+            if (!audioUrl) {
+              throw new Error("Hex音频数据转换失败。");
+            }
 
-        // 🔥 t2a_v2 返回的是JSON格式，音频数据在data.audio字段里(十六进制字符串)
-        const jsonData = await response.json();
-        if (!jsonData.data || !jsonData.data.audio) {
-            throw new Error(`Minimax API 返回格式错误: ${JSON.stringify(jsonData)}`);
-        }
+            bubblesToAnimate.forEach((b) => {
+              const spinner = b.querySelector(".loading-spinner");
+              if (spinner) spinner.style.display = "none";
+              b.classList.add("playing");
+            });
 
-        // 把十六进制字符串转成二进制数据
-        const hexString = jsonData.data.audio;
-        const byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            ttsPlayer.src = audioUrl;
 
-        // 创建音频blob
-        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        ttsPlayer.src = audioUrl;
-
-        const cleanupAndReset = () => {
-            if (isTtsPlaying) {
+            const cleanupAndReset = () => {
+              if (isTtsPlaying) {
                 isTtsPlaying = false;
                 URL.revokeObjectURL(audioUrl);
                 if (window.currentAnimatingBubbles) {
-                    window.currentAnimatingBubbles.forEach(b => b.classList.remove('playing'));
+                  window.currentAnimatingBubbles.forEach((b) =>
+                    b.classList.remove("playing"),
+                  );
                 }
                 currentTtsAudioBubble = null;
                 window.currentAnimatingBubbles = null;
-            }
-        };
+              }
+            };
 
-       ttsPlayer.onended = cleanupAndReset;
+            ttsPlayer.onended = cleanupAndReset;
 
-        ttsPlayer.onerror = (e) => {
-             if (!isIntentionalStop) {
-                 console.error("TTS音频播放时发生错误，已自动切换为文本显示:", e);
-             } else {
-                 console.log("Intentional stop triggered error event, alert skipped.");
-             }
-             cleanupAndReset();
-        };
+            ttsPlayer.onerror = (e) => {
+              if (!isIntentionalStop) {
+                console.error("TTS音频播放时发生错误:", e);
+              }
+              cleanupAndReset();
+            };
 
-        await ttsPlayer.play();
-
-    } catch (error) {
-        console.error("Minimax TTS 调用失败:", error);
-        await showCustomAlert('语音合成失败', `错误信息: ${error.message}`);
-        stopMinimaxAudio();
-    }
-}
+            await ttsPlayer.play();
+          } catch (error) {
+            console.error("Minimax TTS 调用失败:", error);
+            await showCustomAlert("语音合成失败", `错误信息: ${error.message}`);
+            stopMinimaxAudio();
+          }
+        }
 
 // ▲▲▲ 【Minimax TTS】全局变量和核心函数 ▲▲▲
 
@@ -46109,7 +46109,7 @@ document.getElementById('reset-wait-reply-btn-style').addEventListener('click', 
                 state.apiConfig.model = document.getElementById('model-select').value;
                 state.apiConfig.temperature = parseFloat(document.getElementById('temperature-slider').value) || 0.8;
                 // ▼▼▼ 【Minimax TTS】保存minimax配置 ▼▼▼
-                state.apiConfig.minimaxDomain = document.getElementById('minimax-domain-select').value;
+                state.apiConfig.minimaxProvider = document.getElementById('minimax-provider-select').value;
                 state.apiConfig.minimaxGroupId = document.getElementById('minimax-group-id').value.trim();
                 state.apiConfig.minimaxApiKey = document.getElementById('minimax-api-key').value.trim();
                 state.apiConfig.minimaxSpeechModel = document.getElementById('minimax-speech-model-select').value;
@@ -47028,10 +47028,10 @@ document.getElementById('chat-settings-btn').addEventListener('click', async () 
         document.getElementById('minimax-voice-id-input').value = chat.settings.minimaxVoiceId || '';
 
         // 🔥【新增】加载语速和语言设置
-        const voiceSpeed = parseFloat(chat.settings.minimaxVoiceSpeed) || 1.0;
+        const voiceSpeed = chat.settings.speed ?? 1.0;
         document.getElementById('minimax-voice-speed-input').value = voiceSpeed;
         document.getElementById('minimax-voice-speed-value').textContent = voiceSpeed;
-        document.getElementById('minimax-language-input').value = chat.settings.minimaxLanguage || '';
+        document.getElementById('minimax-language-input').value = chat.settings.language_boost || '';
         // ▲▲▲ 【Minimax TTS】加载minimaxVoiceId ▲▲▲
 
         // 【核心修改2】如果是单聊，就加载分组列表到下拉框
@@ -47713,8 +47713,8 @@ const checkedBooks = document.querySelectorAll('#world-book-checkboxes-container
             chat.settings.minimaxVoiceId = document.getElementById('minimax-voice-id-input').value.trim();
 
             // 🔥【新增】保存语速和语言设置
-            chat.settings.minimaxVoiceSpeed = parseFloat(document.getElementById('minimax-voice-speed-input').value) || 1.0;
-            chat.settings.minimaxLanguage = document.getElementById('minimax-language-input').value;
+            chat.settings.speed = parseFloat(document.getElementById('minimax-voice-speed-input').value) || 1.0;
+            chat.settings.language_boost = document.getElementById('minimax-language-input').value || null;
             // ▲▲▲ 【Minimax TTS】保存minimaxVoiceId ▲▲▲
         }
 
@@ -50059,24 +50059,23 @@ function fetchMinimaxSpeechModels() {
 function stopMinimaxAudio() {
     if (!isTtsPlaying) return;
 
-    // 核心修改1：在执行停止操作前，先设置"故意停止"的标志为 true
     isIntentionalStop = true;
-
     const ttsPlayer = document.getElementById('tts-audio-player');
     ttsPlayer.pause();
-    ttsPlayer.src = ''; // 这行代码会触发 onerror 事件
+    ttsPlayer.src = ''; // 这会触发 onerror 事件，从而执行清理
 
     if (window.currentAnimatingBubbles) {
-        window.currentAnimatingBubbles.forEach(b => b.classList.remove('playing'));
+        window.currentAnimatingBubbles.forEach((b) => {
+            const spinner = b.querySelector('.loading-spinner');
+            if (spinner) spinner.style.display = 'none';
+            b.classList.remove('playing');
+        });
     }
 
     isTtsPlaying = false;
     currentTtsAudioBubble = null;
     window.currentAnimatingBubbles = null;
-    console.log('Minimax TTS: Playback stopped by user.');
 
-    // 核心修改2：用一个微小的延迟来重置标志位
-    // 这能确保 onerror 事件有足够的时间检查到标志位，然后再将其重置
     setTimeout(() => {
         isIntentionalStop = false;
     }, 100);
@@ -50089,173 +50088,147 @@ function stopMinimaxAudio() {
  * @param {Array<HTMLElement>} bubblesToAnimate - 需要播放动画的所有语音气泡元素的数组
  */
 async function playMinimaxAudio(text, voiceId, bubblesToAnimate) {
+  stopMinimaxAudio();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  const ttsPlayer = document.getElementById("tts-audio-player");
+  const firstBubble = bubblesToAnimate[0];
+  if (!firstBubble) return;
+
+  isTtsPlaying = true;
+  currentTtsAudioBubble = firstBubble;
+  window.currentAnimatingBubbles = bubblesToAnimate;
+  bubblesToAnimate.forEach((b) => {
+    const spinner = b.querySelector(".loading-spinner");
+    if (spinner) spinner.style.display = "block";
+  });
+
+  const mainAudioPlayer = document.getElementById("audio-player");
+  if (mainAudioPlayer && !mainAudioPlayer.paused) {
+    mainAudioPlayer.pause();
+    state.musicState.isPlaying = false;
+    updatePlayerUI();
+  }
+
+  const groupId = state.apiConfig.minimaxGroupId;
+  const apiKey = state.apiConfig.minimaxApiKey;
+  if (!groupId || !apiKey) {
+    await showCustomAlert(
+      "语音播放失败",
+      "尚未配置Minimax的Group ID和API Key。",
+    );
     stopMinimaxAudio();
-    await new Promise(resolve => setTimeout(resolve, 50));
+    return;
+  }
 
-    const ttsPlayer = document.getElementById('tts-audio-player');
-    const firstBubble = bubblesToAnimate[0];
+  const chat = state.chats[state.activeChatId];
+  if (!chat) {
+    stopMinimaxAudio();
+    return;
+  }
 
-    isTtsPlaying = true;
-    currentTtsAudioBubble = firstBubble;
-    window.currentAnimatingBubbles = bubblesToAnimate;
-    bubblesToAnimate.forEach(b => b.classList.add('playing'));
+  const provider = state.apiConfig.minimaxProvider || "cn";
+  const speechModel =
+    state.apiConfig.minimaxSpeechModel || "speech-01-turbo";
+  const baseUrl =
+    provider === "cn"
+      ? "https://api.minimaxi.com"
+      : "https://api.minimax.io";
+  const requestUrl = `${baseUrl}/v1/t2a_v2`;
+  // 1. 从当前角色的设置中读取语速和语言增强
+  const speed = chat.settings.speed ?? 1.0;
+  const langBoost = chat.settings.language_boost; // 如果是null或undefined, 就让它是null/undefined
 
-    const mainAudioPlayer = document.getElementById('audio-player');
-    if (mainAudioPlayer && !mainAudioPlayer.paused) {
-        mainAudioPlayer.pause();
-        musicState.isPlaying = false;
-        updatePlayerUI();
+  const textForTts = text
+    .replace(/\(.*?\)|（.*?）|【.*?】/g, "")
+    .trim();
+
+  // 2. 构建包含新参数的请求体
+  const requestBody = {
+    model: speechModel,
+    text: textForTts, // <--- 核心修改在这里！使用过滤后的文本
+    voice_setting: {
+      voice_id: voiceId,
+      speed: speed, // ★ 在这里加入语速
+    },
+  };
+
+  // 3. 如果 language_boost 有效，才将它添加到请求体中
+  if (langBoost) {
+    requestBody.language_boost = langBoost;
+  }
+
+  console.log(`[Minimax TTS] Request to ${requestUrl}`, requestBody);
+
+  try {
+    const response = await fetch(`${requestUrl}?GroupId=${groupId}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json();
+
+    if (
+      !response.ok ||
+      (result.base_resp && result.base_resp.status_code !== 0)
+    ) {
+      throw new Error(
+        `API错误码 ${
+          result.base_resp?.status_code || response.status
+        }: ${result.base_resp?.status_msg || response.statusText}`,
+      );
     }
 
-    const groupId = state.apiConfig.minimaxGroupId;
-    const apiKey = state.apiConfig.minimaxApiKey;
-    if (!groupId || !apiKey) {
-        await showCustomAlert('语音播放失败', '尚未配置Minimax的Group ID和API Key。');
-        stopMinimaxAudio();
-        return;
+    if (!result.data || !result.data.audio) {
+      throw new Error("API响应中未找到有效的音频数据。");
     }
 
-    // ★★★ 核心修改：从全局 apiConfig 获取语音模型 ★★★
-    const speechModel = state.apiConfig.minimaxSpeechModel || 'speech-01-turbo';
+    const audioUrl = hexToBlobUrl(result.data.audio);
+    if (!audioUrl) {
+      throw new Error("Hex音频数据转换失败。");
+    }
 
-    console.log(`正在使用 Minimax 语音模型: ${speechModel}`);
+    bubblesToAnimate.forEach((b) => {
+      const spinner = b.querySelector(".loading-spinner");
+      if (spinner) spinner.style.display = "none";
+      b.classList.add("playing");
+    });
 
-    // 🔥【新增】从聊天设置里获取语速和语言参数
-    const chat = state.chats[state.activeChatId];
-    const voiceSpeed = parseFloat(chat?.settings?.minimaxVoiceSpeed) || 1.0;
-    const language = chat?.settings?.minimaxLanguage || '';
-    console.log(`Minimax TTS 参数: 语速=${voiceSpeed}, 语言=${language || '未设置'}`);
+    ttsPlayer.src = audioUrl;
 
-    // 🔥 t2a_v2接口 - 最简单的参数,不加emotion
-    const requestBody = {
-        text: text,
-        model: speechModel,
-        voice_setting: {
-            voice_id: voiceId,
-            speed: voiceSpeed,
-            pitch: 0,
+    const cleanupAndReset = () => {
+      if (isTtsPlaying) {
+        isTtsPlaying = false;
+        URL.revokeObjectURL(audioUrl);
+        if (window.currentAnimatingBubbles) {
+          window.currentAnimatingBubbles.forEach((b) =>
+            b.classList.remove("playing"),
+          );
         }
+        currentTtsAudioBubble = null;
+        window.currentAnimatingBubbles = null;
+      }
     };
 
-    // 🔥【修复】如果设置了语言增强，直接使用选择的值（已经是完整的语言名称了）
-    if (language) {
-        requestBody.language_boost = language;
-    }
+    ttsPlayer.onended = cleanupAndReset;
 
-    console.log('t2a_v2 请求参数:', JSON.stringify(requestBody, null, 2));
+    ttsPlayer.onerror = (e) => {
+      if (!isIntentionalStop) {
+        console.error("TTS音频播放时发生错误:", e);
+      }
+      cleanupAndReset();
+    };
 
-    try {
-        // 🔥【新增】根据服务区选择动态切换API地址
-        let baseUrl = document.getElementById('minimax-domain-select').value || 'https://api.minimax.chat';
-        let requestUrl = `${baseUrl}/v1/t2a_v2?GroupId=${groupId}`;
-
-        console.log(`使用API地址: ${baseUrl}, 请求地址: ${requestUrl}`);
-        console.log(`【调试】请求头:`, { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' });
-        console.log(`【调试】请求体:`, requestBody);
-
-        // 🔥【CORS代理】尝试多个CORS代理
-        const corsProxies = [
-            'https://allorigins.win/raw?url=',
-            'https://api.allorigins.win/raw?url=',
-            'https://cors-anywhere.herokuapp.com/'
-        ];
-
-        console.log(`【调试】尝试直接请求: ${requestUrl}`);
-
-        // 使用t2a_v2接口,音质更好更自然
-        let response;
-        let lastError;
-
-        // 先尝试直接请求
-        try {
-            response = await fetch(requestUrl, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-        } catch (error) {
-            lastError = error;
-            console.log(`【调试】直接请求失败: ${error.message}`);
-
-            // 尝试CORS代理
-            for (let proxy of corsProxies) {
-                try {
-                    const proxiedUrl = proxy + encodeURIComponent(requestUrl);
-                    console.log(`【调试】尝试CORS代理: ${proxy}`);
-                    response = await fetch(proxiedUrl, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
-                    });
-                    if (response.ok) {
-                        console.log(`【调试】CORS代理成功: ${proxy}`);
-                        break;
-                    }
-                } catch (proxyError) {
-                    console.log(`【调试】CORS代理失败 ${proxy}: ${proxyError.message}`);
-                    lastError = proxyError;
-                }
-            }
-        }
-
-        console.log(`【调试】响应状态: ${response.status} ${response.statusText}`);
-        console.log(`【调试】响应头:`, {
-            'content-type': response.headers.get('content-type'),
-            'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
-            'access-control-allow-methods': response.headers.get('access-control-allow-methods')
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Minimax API 错误: ${errorData.base_resp?.status_msg || response.statusText}`);
-        }
-
-        // 🔥 t2a_v2 返回的是JSON格式，音频数据在data.audio字段里(十六进制字符串)
-        const jsonData = await response.json();
-        if (!jsonData.data || !jsonData.data.audio) {
-            throw new Error(`Minimax API 返回格式错误: ${JSON.stringify(jsonData)}`);
-        }
-
-        // 把十六进制字符串转成二进制数据
-        const hexString = jsonData.data.audio;
-        const byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-
-        // 创建音频blob
-        const audioBlob = new Blob([byteArray], { type: 'audio/mpeg' });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        ttsPlayer.src = audioUrl;
-
-        const cleanupAndReset = () => {
-            if (isTtsPlaying) {
-                isTtsPlaying = false;
-                URL.revokeObjectURL(audioUrl);
-                if (window.currentAnimatingBubbles) {
-                    window.currentAnimatingBubbles.forEach(b => b.classList.remove('playing'));
-                }
-                currentTtsAudioBubble = null;
-                window.currentAnimatingBubbles = null;
-            }
-        };
-
-       ttsPlayer.onended = cleanupAndReset;
-
-        ttsPlayer.onerror = (e) => {
-             if (!isIntentionalStop) {
-                 console.error("TTS音频播放时发生错误，已自动切换为文本显示:", e);
-             } else {
-                 console.log("Intentional stop triggered error event, alert skipped.");
-             }
-             cleanupAndReset();
-        };
-
-        await ttsPlayer.play();
-
-    } catch (error) {
-        console.error("Minimax TTS 调用失败:", error);
-        await showCustomAlert('语音合成失败', `错误信息: ${error.message}`);
-        stopMinimaxAudio();
-    }
+    await ttsPlayer.play();
+  } catch (error) {
+    console.error("Minimax TTS 调用失败:", error);
+    await showCustomAlert("语音合成失败", `错误信息: ${error.message}`);
+    stopMinimaxAudio();
+  }
 }
 
 // ▲▲▲ 【Minimax TTS】核心函数 ▲▲▲
